@@ -1,0 +1,199 @@
+---
+title: "Reanalysis of 'Benefit valuation predicts gratitude'"
+author: "Forster, Pedersen, Smith, McCullough, & Lieberman"
+output:
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r warning = F, message = F}
+library(tidyverse)
+library(lmerTest)
+library(semTools)
+```
+
+# About this Reanalysis
+
+These are re-analyses (and alternative analyses) to those presented in 'Benefit valuation predicts gratitude' (Forster et al., 2017).
+
+See the companion syntax file for data cleaning procedures that produced `grat_wtr_study1_clean.csv`.
+
+# Study 1
+
+```{r message = F}
+study1_clean <- read_csv("grat_wtr_study1_clean.csv")
+```
+
+
+## Boxplots
+
+WTR other->self
+
+```{r}
+study1_clean %>%
+  # just to get one WTR estimate per person, remove all but one row/person
+  filter(scenario == "S1") %>% 
+  ggplot(aes(x = cond, y = wtr_os_est)) +
+  geom_boxplot() +
+  labs(title = "Study 1 WTR_os by relationship type", x = "Relationship Type", y = "WTR_os") +
+  theme_classic() +
+  theme(axis.text.x = element_text(angle = 45, vjust = .8))
+```
+
+WTR self->other
+
+```{r}
+study1_clean %>%
+  # just to get one WTR estimate per person, remove all but one row/person
+  filter(scenario == "S1") %>% 
+  ggplot(aes(x = cond, y = wtr_so_est)) +
+  geom_boxplot() +
+  labs(title = "Study 1 WTR_so by relationship type", x = "Relationship Type", y = "WTR_so") +
+  theme_classic() +
+  theme(axis.text.x = element_text(angle = 45, vjust = .8))
+```
+
+
+## Analyses
+
+
+Gratitude as outcome
+
+```{r}
+grat_out <- lmer(grateful ~ wtr_os_est * mean_log_val + (1 | ResponseId), data = study1_clean)
+summary(grat_out)
+```
+
+Obligation as outcome
+
+```{r}
+oblig_out <- lmer(obligated ~ wtr_os_est * mean_log_val + (1 + mean_log_val | ResponseId), data = study1_clean)
+summary(oblig_out)
+```
+
+Want to Return as outcome
+
+```{r}
+want_out <- lmer(want ~ wtr_os_est * mean_log_val + (1 + mean_log_val | ResponseId), data = study1_clean)
+summary(want_out)
+```
+
+Happiness as outcome
+
+```{r}
+happy_out <- lmer(happy ~ wtr_os_est * mean_log_val + (1 + mean_log_val | ResponseId), data = study1_clean)
+summary(happy_out)
+```
+
+
+# Study 2
+
+```{r message = F}
+study2_clean <- read_csv("grat_wtr_study2_clean.csv")
+```
+
+## Boxplots
+
+WTR other->self
+
+```{r}
+study2_clean %>% 
+  ggplot(aes(x = cond, y = wtr_os_est)) +
+  geom_boxplot() +
+  labs(title = "Study 2 WTR_os across Relationship Type", x = "Relationship Type", y = "WTR_os") +
+  theme_classic() +
+  theme(axis.text.x = element_text(angle = 45, vjust = .8))
+```
+
+
+WTR self->other
+
+```{r}
+study2_clean %>% 
+  ggplot(aes(x = cond, y = wtr_so_est)) +
+  geom_boxplot() +
+  labs(title = "Study 2 WTR_so across Relationship Type", x = "Relationship Type", y = "WTR_so") +
+  theme_classic() +
+  theme(axis.text.x = element_text(angle = 45, vjust = .8))
+```
+
+## Analyses
+
+
+Mean-center WTR variables
+
+```{r}
+study2_clean <- study2_clean %>% 
+  mutate(wtr_so_mc = wtr_so_est - mean(wtr_so_est, na.rm = T),
+         wtr_os_mc = wtr_os_est - mean(wtr_os_est, na.rm = T),
+         log_ben_mc = log_ben - mean(log_ben, na.rm = T),
+         wtr_so_int = wtr_so_mc * log_ben_mc,
+         wtr_os_int = wtr_os_mc * log_ben_mc)
+```
+
+
+
+```{r}
+
+grat_model <- '
+  gratitude =~ NA*grateful + thankful + appreciative
+  gratitude ~~ 1*gratitude
+  gratitude ~ 0*1
+  
+  gratitude ~ wtr_os_mc + log_ben_mc + wtr_os_int
+'
+
+grat_sem <- sem(grat_model, data = study2_clean, ordered = c("grateful", "thankful", "appreciative"))
+
+summary(grat_sem, standardized = T, rsquare = T)
+
+```
+
+In this model, only about .5% of variance is attributable to WTR_os
+
+```{r}
+grat_so_model <- '
+  gratitude =~ NA*grateful + thankful + appreciative
+  gratitude ~~ 1*gratitude
+  gratitude ~ 0*1
+  
+  gratitude ~ wtr_so_mc + log_ben_mc + wtr_so_int
+'
+
+grat_so_sem <- sem(grat_so_model, data = study2_clean, ordered = c("grateful", "thankful", "appreciative"))
+
+summary(grat_so_sem, standardized = T, rsquare = T)
+```
+
+Here, WTR_so only accounts for about 1.3% of variance in gratitude.
+
+```{r}
+indebt_os_model <- '
+  indebt =~ NA*indebted + burdened + required + owed
+  indebt ~~ 1*indebt
+  indebt ~ 0*1
+  
+  indebt ~ wtr_os_mc + log_ben_mc + wtr_os_int
+'
+
+indebt_os_sem <- sem(indebt_os_model, data = study2_clean, ordered = c("indebted","burdened", "required", "owed"))
+
+summary(indebt_os_sem, standardized = T, rsquare = T)
+```
+
+```{r}
+indebt_so_model <- '
+  indebt =~ NA*indebted + burdened + required + owed
+  indebt ~~ 1*indebt
+  indebt ~ 0*1
+  
+  indebt ~ wtr_so_mc + log_ben_mc + wtr_so_int
+'
+
+indebt_so_sem <- sem(indebt_so_model, data = study2_clean, ordered = c("indebted","burdened", "required", "owed"))
+
+summary(indebt_so_sem, standardized = T, rsquare = T)
+```

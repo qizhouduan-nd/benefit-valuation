@@ -1,0 +1,461 @@
+---
+title: "Re-cleaning of EHB Gratitude Data"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Study 1 (cleaning w/ values)
+
+```{r}
+study1 <- read.csv("grat_wtr_study1_vals.csv", header = T, na.strings = "", stringsAsFactors = F)
+study1 <- study1[-c(1,2),]
+```
+
+```{r}
+wtr_names <- names(study1)[grepl("WTR", names(study1))]
+
+wtr_map <- setNames(c(seq(85, 5, by = -10), 0), 1:10)
+
+
+study1_clean <- study1 %>% 
+  # convert to long format
+  gather(wtr_q, value, wtr_names) %>% 
+  # Separate WTR variable into the category (self->other and other->self) and which question
+  separate(wtr_q, c("wtr_cat", "wtr_num"), sep = "_") %>%  
+  # create 0/1 values from the string responses (0 = allocate to decision-maker; 1 = allocate to non-decision-maker)
+  mutate(new_value = as.numeric(value),
+         new_value = new_value - 1,
+         wtr_num = as.numeric(wtr_num)) %>% 
+  # For each subject and category of WTR response, record new values for computing WTR
+  group_by(ResponseId, wtr_cat) %>% 
+  arrange(wtr_num) %>% 
+  mutate(n_switch = sum(abs(diff(new_value))),
+         loc_switch = which(new_value == 1)[1],
+         wtr_vals = wtr_map[wtr_num],
+         n_switch_so = ifelse(wtr_cat == "WTRso", n_switch, NA),
+         n_switch_os = ifelse(wtr_cat == "WTRos", n_switch, NA),
+         loc_so = ifelse(wtr_cat == "WTRso", loc_switch, NA),
+         loc_os = ifelse(wtr_cat == "WTRos", loc_switch, NA)) %>%
+  ungroup() %>%
+  # fill in NA values for each subject. self->other values get filled down; other->self values get filled up
+  group_by(ResponseId) %>%
+  fill(n_switch_so, .direction = "down") %>% 
+  fill(n_switch_os, .direction = "up") %>%  
+  fill(loc_so, .direction = "down") %>% 
+  fill(loc_os, .direction = "up") %>% 
+  ungroup() %>% 
+  group_by(ResponseId, wtr_cat) %>% 
+  mutate(wtr_so_est = ifelse(is.na(loc_so), 0, 
+                             mean(c(wtr_map[loc_so], wtr_map[loc_so-1]), na.rm = T)/75),
+         wtr_os_est = ifelse(is.na(loc_os), 0, 
+                             mean(c(wtr_map[loc_os], wtr_map[loc_os-1]), na.rm = T)/75)) %>% 
+  # rejoin WTR categories and question numbers
+  unite(wtr_q, wtr_cat:wtr_num, sep = "_") %>%
+  # remove variables we don't need anymore
+  select(-c(value, loc_switch, wtr_vals, n_switch)) %>% 
+  # re-convert to wide format
+  spread(wtr_q, new_value) %>% 
+  filter(n_switch_so < 2 & n_switch_os < 2)
+
+# yet again, we're mappting numeric questions to their respective emotional content
+q_num <- 1:4
+q_val <- c("grateful", "happy", "want", "obligated")
+
+q_map <- setNames(q_val, q_num)
+
+study1_restructure <- study1_clean %>% 
+  # make data long format with respect to scenario/question combination
+  gather(scenario, value, S1_1:S21_4) %>% 
+  # separate the scenarios from their emotion questions
+  separate(scenario, c("scenario", "question"), sep = "_") %>% 
+  # replace question number with emotion content
+  mutate(question = q_map[question]) %>% 
+  # make emotion question wide format while retaining long format of scenario
+  spread(question, value)
+
+study1_restructure[,q_val] <- sapply(study1_restructure[,q_val], as.numeric)
+```
+
+
+```{r}
+study1_scaling <- read.csv("grat_wtr_study1_scaling.csv", header = T)
+study1_scaling <- study1_scaling[-(1:2),]
+study1_scaling[,paste("S",1:21,sep="")] <- sapply(study1_scaling[,paste("S",1:21,sep="")], as.character)
+study1_scaling[,paste("S",1:21,sep="")] <- sapply(study1_scaling[,paste("S",1:21,sep="")], as.numeric)
+
+scale_map <- colMeans(study1_scaling[,paste("S",1:21,sep="")], na.rm = T)
+
+study1_restructure$scenario_val <- scale_map[study1_restructure$scenario]
+
+study1_restructure$log_scenario_val <- log(study1_restructure$scenario_val, base = 10)
+
+```
+
+
+Mean-center values
+
+```{r}
+study1_restructure %<>% 
+  group_by(ResponseId) %>% 
+  mutate(mean_log_val = log_scenario_val - mean(log_scenario_val))
+```
+
+```{r}
+write.csv(study1_restructure, "grat_wtr_study1_clean.csv", row.names = F)
+```
+
+
+## Study 2 cleaning
+
+```{r}
+study2 <- read.csv("grat_wtr_study2_vals.csv", header = T)
+study2 <- study2[-c(1,2),]
+
+```
+
+```{r}
+wtr_names <- names(study2)[grepl("WTR", names(study2))]
+
+wtr_map <- setNames(c(seq(85, 5, by = -10), 0), 1:10)
+
+
+study2_clean <- study2 %>% 
+  # convert to long format
+  gather(wtr_q, value, wtr_names) %>% 
+  # Separate WTR variable into the category (self->other and other->self) and which question
+  separate(wtr_q, c("wtr_cat", "wtr_num"), sep = "_") %>%  
+  # create 0/1 values from the string responses (0 = allocate to decision-maker; 1 = allocate to non-decision-maker)
+  mutate(new_value = as.numeric(value),
+         new_value = new_value - 1,
+         wtr_num = as.numeric(wtr_num)) %>% 
+  # For each subject and category of WTR response, record new values for computing WTR
+  group_by(ResponseId, wtr_cat) %>% 
+  arrange(wtr_num) %>% 
+  mutate(n_switch = sum(abs(diff(new_value))),
+         loc_switch = which(new_value == 1)[1],
+         wtr_vals = wtr_map[wtr_num],
+         n_switch_so = ifelse(wtr_cat == "WTRso", n_switch, NA),
+         n_switch_os = ifelse(wtr_cat == "WTRos", n_switch, NA),
+         loc_so = ifelse(wtr_cat == "WTRso", loc_switch, NA),
+         loc_os = ifelse(wtr_cat == "WTRos", loc_switch, NA)) %>%
+  ungroup() %>%
+  # fill in NA values for each subject. self->other values get filled down; other->self values get filled up
+  group_by(ResponseId) %>%
+  fill(n_switch_so, .direction = "down") %>% 
+  fill(n_switch_os, .direction = "up") %>%  
+  fill(loc_so, .direction = "down") %>% 
+  fill(loc_os, .direction = "up") %>% 
+  ungroup() %>% 
+  group_by(ResponseId, wtr_cat) %>% 
+  mutate(wtr_so_est = ifelse(is.na(loc_so), 0, 
+                             mean(c(wtr_map[loc_so], wtr_map[loc_so-1]), na.rm = T)/75),
+         wtr_os_est = ifelse(is.na(loc_os), 0, 
+                             mean(c(wtr_map[loc_os], wtr_map[loc_os-1]), na.rm = T)/75)) %>% 
+  # rejoin WTR categories and question numbers
+  unite(wtr_q, wtr_cat:wtr_num, sep = "_") %>%
+  # remove variables we don't need anymore
+  select(-c(value, loc_switch, wtr_vals, n_switch)) %>% 
+  # re-convert to wide format
+  spread(wtr_q, new_value) %>% 
+  filter(n_switch_so < 2 & n_switch_os < 2)
+```
+
+Amounts received based on column prefix:
+
+M0: $0.01
+Q57: $1.00
+Q58: $10.00
+Q59: $100.00
+Q60: $1000.00
+
+Question content based on column suffix:
+
+_1: grateful
+_2: happy
+_3: burdened
+_4: required
+_5: thankful
+_6: appreciative
+_7: indebted
+_8: joyful
+_9: pleased
+_10: want_return
+_11: owed (M0, Q57, Q58, Q60); expects_return (Q59)
+_12: expects_return (M0, Q57, Q58, Q60); owed (Q59)
+
+```{r}
+
+ben_01_names <- paste("M0", 1:12, sep = "_")
+ben_1_names <- paste("Q57", 1:12, sep = "_")
+ben_10_names <- paste("Q58", 1:12, sep = "_")
+ben_100_names <- paste("Q59", 1:12, sep = "_")
+ben_1000_names <- paste("Q60", 1:12, sep = "_")
+
+q_typical <- c("grateful", "happy", "burdened", "required", "thankful", "appreciative", "indebted", "joyful", "pleased", "want", "owed", "expects")
+
+q_Q59 <- c("grateful", "happy", "burdened", "required", "thankful", "appreciative", "indebted", "joyful", "pleased", "want", "expects", "owed")
+
+new_01_names <- paste(q_typical, "01", sep = "_")
+new_1_names <- paste(q_typical, "1", sep = "_")
+new_10_names <- paste(q_typical, "10", sep = "_")
+new_100_names <- paste(q_Q59, "100", sep = "_")
+new_1000_names <- paste(q_typical, "1000", sep = "_")
+
+# Create column name maps
+
+map_01 <- setNames(new_01_names, ben_01_names)
+map_1 <- setNames(new_1_names, ben_1_names)
+map_10 <- setNames(new_10_names, ben_10_names)
+map_100 <- setNames(new_100_names, ben_100_names)
+map_1000 <- setNames(new_1000_names, ben_1000_names)
+
+# Copy data frame in case renaming goes awry
+
+study2_copy <- study2_clean
+
+# Map new column names to old
+
+names(study2_clean)[grep("M0", names(study2_clean))] <- map_01[names(study2_clean)[grep("M0", names(study2_clean))]]
+names(study2_clean)[grep("Q57", names(study2_clean))] <- map_1[names(study2_clean)[grep("Q57", names(study2_clean))]]
+names(study2_clean)[grep("Q58", names(study2_clean))] <- map_10[names(study2_clean)[grep("Q58", names(study2_clean))]]
+names(study2_clean)[grep("Q59", names(study2_clean))] <- map_100[names(study2_clean)[grep("Q59", names(study2_clean))]]
+names(study2_clean)[grep("Q60", names(study2_clean))] <- map_1000[names(study2_clean)[grep("Q60", names(study2_clean))]]
+
+```
+
+
+Because I didn't just display a value based on a randomly assigned condition, and instead randomly sent people to a unique set of questions for which the random condition was displayed, I now have to shift all emotion responses to new columns and also record the condition variable.
+
+I think for-loops are probably the best way to accomplish this.
+
+```{r}
+study2_clean[study2_clean == ""] <- NA
+
+new_names_typical <- gsub("_01", "", new_01_names)
+new_names_atypical <- gsub("_100", "", new_100_names) # order was odd for $100 benefit condition
+
+study2_clean[, new_names_typical] <- NA
+
+for (r in 1:nrow(study2_clean)) {
+  rows_01 <- study2_clean[r, new_01_names]
+  rows_1 <- study2_clean[r, new_1_names]
+  rows_10 <- study2_clean[r, new_10_names]
+  rows_100 <- study2_clean[r, new_100_names]
+  rows_1000 <- study2_clean[r, new_1000_names]
+  if (all(!is.na(rows_01))) {
+    study2_clean[r, "ben_cond"] <- .01
+    study2_clean[r, new_names_typical] <- study2_clean[r, new_01_names]
+  }
+  if (all(!is.na(rows_1))) {
+    study2_clean[r, "ben_cond"] <- 1
+    study2_clean[r, new_names_typical] <- study2_clean[r, new_1_names]
+  }
+  if (all(!is.na(rows_10))) {
+    study2_clean[r, "ben_cond"] <- 10
+    study2_clean[r, new_names_typical] <- study2_clean[r, new_10_names]
+  }
+  if (all(!is.na(rows_100))) {
+    study2_clean[r, "ben_cond"] <- 100
+    study2_clean[r, new_names_atypical] <- study2_clean[r, new_100_names]
+  }
+  if (all(!is.na(rows_1000))) {
+    study2_clean[r, "ben_cond"] <- 1000
+    study2_clean[r, new_names_typical] <- study2_clean[r, new_1000_names]
+  }
+}
+
+study2_clean %<>% 
+  mutate(log_ben = log(ben_cond, base = 10)) %>% 
+  select(-c(new_01_names, new_1_names, new_10_names, new_100_names, new_1000_names))
+
+```
+
+
+```{r}
+write.csv(study2_clean, "grat_wtr_study2_clean.csv", row.names = F)
+```
+
+## Outdated syntax
+
+This code is just to make sure the reshaping was done successfully at different steps. Ignore it.
+
+```{r eval = F}
+
+# to check before reverting from long to wide format
+study1_clean %>% select(ResponseId, wtr_cat, new_value, wtr_vals, n_switch_so, n_switch_os, loc_switch, loc_so, loc_os, wtr_so_est, wtr_os_est) %>% arrange(ResponseId, wtr_cat) %>% View()
+
+# to check after getting back to wide format
+
+study1_clean %>% select(ResponseId, wtr_names, wtr_so_est, wtr_os_est, loc_so, loc_os, n_switch_so, n_switch_os) %>% View()
+```
+
+### Ignore This
+
+This was code I had from before I realized I could download a data set with numeric values. I'm keeping it here just in case I need any of it later.
+
+```{r eval = F}
+study1 <- read.csv("grat_wtr_study1.csv", header = T, na.strings = "", stringsAsFactors = F)
+study1 <- study1[-c(1,2),]
+```
+
+## Clean up WTR responses and compute WTR estimates
+
+```{r eval = F}
+
+# map WTR questions (1-10) to their respective monetary values (decreasing from 85-0)
+
+wtr_names <- names(study1)[grepl("WTR", names(study1))]
+
+wtr_map <- setNames(c(seq(85, 5, by = -10), 0), 1:10)
+
+
+
+study1_clean <- study1 %>% 
+  # convert to long format
+  gather(wtr_q, value, wtr_names) %>% 
+  # Separate WTR variable into the category (self->other and other->self) and which question
+  separate(wtr_q, c("wtr_cat", "wtr_num"), sep = "_") %>% 
+  # create 0/1 values from the string responses (0 = allocate to decision-maker; 1 = allocate to non-decision-maker)
+  mutate(new_value = ifelse(wtr_cat == "WTRso" & value == "$75 for ${e://Field/init}", 1,
+                        ifelse(wtr_cat == "WTRos" & value == "$75 for you", 1,
+                               ifelse(value == "NA", NA, 0))),
+         new_value = as.numeric(new_value)) %>% 
+  # For each subject and category of WTR response, record new values for computing WTR
+  group_by(ResponseId, wtr_cat) %>%
+  mutate(n_switch = sum(abs(diff(new_value))),
+         loc_switch = which(new_value == 1)[1],
+         wtr_vals = wtr_map[wtr_num],
+         n_switch_so = ifelse(wtr_cat == "WTRso", n_switch, NA),
+         n_switch_os = ifelse(wtr_cat == "WTRos", n_switch, NA),
+         loc_so = ifelse(wtr_cat == "WTRso", loc_switch, NA),
+         loc_os = ifelse(wtr_cat == "WTRos", loc_switch, NA)) %>%
+  ungroup() %>%
+  # fill in NA values for each subject. self->other values get filled down; other->self values get filled up
+  group_by(ResponseId) %>%
+  fill(n_switch_so, .direction = "down") %>% 
+  fill(n_switch_os, .direction = "up") %>%  
+  fill(loc_so, .direction = "down") %>% 
+  fill(loc_os, .direction = "up") %>% 
+  ungroup() %>% 
+  group_by(ResponseId, wtr_cat) %>% 
+  mutate(wtr_so_est = ifelse(is.na(loc_so), 0, 
+                             mean(c(wtr_map[loc_so], wtr_map[loc_so-1]), na.rm = T)/75),
+         wtr_os_est = ifelse(is.na(loc_os), 0, 
+                             mean(c(wtr_map[loc_os], wtr_map[loc_os-1]), na.rm = T)/75)) %>% 
+  # rejoin WTR categories and question numbers
+  unite(wtr_q, wtr_cat:wtr_num, sep = "_") %>%
+  # remove variables we don't need anymore
+  select(-c(value, loc_switch, wtr_vals, n_switch)) %>% 
+  # re-convert to wide format
+  spread(wtr_q, new_value) %>% 
+  filter(n_switch_so < 2 & n_switch_os < 2)
+  
+```
+
+```{r eval = F}
+# to check before reverting from long to wide format
+study1_clean %>% select(ResponseId, wtr_cat, new_value, wtr_vals, wtr_so_est, wtr_os_est, n_switch_so, n_switch_os, loc_switch, loc_so, loc_os) %>% arrange(ResponseId) %>% filter(n_switch_so == 0) %>% View()
+
+# to check after getting back to wide format
+
+study1_clean %>% select(ResponseId, wtr_names, wtr_so_est, wtr_os_est, loc_so, loc_os, n_switch_so, n_switch_os) %>% View()
+```
+
+
+## Clean up emotion responses
+
+```{r eval = F}
+# create vector to capture names of scenario variables
+scenarios <- paste("S", rep(1:21, 4), "_", 1:4, sep = "") %>% sort()
+
+# create map to convert strings to numbers
+scenario_vals <- c("Not at all", "Very Little", "Somewhat", "Moderately", "Very Much", "Extremely")
+scenario_nums <- c(0, 1, 2, 3, 4, 5)
+
+scenario_map <- setNames(scenario_nums, scenario_vals)
+
+# go through each scenario column and replace strings with numbers
+for(s in unique(scenarios)) {
+  study1_clean[, s] <- scenario_map[unlist(study1_clean[, s])] # unlist() is necessary for the function to work
+}
+
+```
+
+
+Q1: How grateful?
+Q2: How happy?
+Q3: Want to return gesture?
+Q4: Obligated to return gesture?
+
+## Reorient data for MLM
+
+Now we need to make data long format with respect to the repeated measures of scenario.
+
+```{r eval = F}
+# yet again, we're mappting numeric questions to their respective emotional content
+q_num <- 1:4
+q_val <- c("grateful", "happy", "want", "obligated")
+
+q_map <- setNames(q_val, q_num)
+
+study1_clean <- study1_clean %>% 
+  # make data long format with respect to scenario/question combination
+  gather(scenario, value, S1_1:S21_4) %>% 
+  # separate the scenarios from their emotion questions
+  separate(scenario, c("scenario", "question"), sep = "_") %>% 
+  # replace question number with emotion content
+  mutate(question = q_map[question]) %>% 
+  # make emotion question wide format while retaining long format of scenario
+  spread(question, value)
+```
+
+```{r eval = F}
+# just to check that the restructure is up to snuff
+study1_clean %>% select(ResponseId, scenario, q_val, wtr_so_est, wtr_os_est, n_switch_so, n_switch_os) %>% View()
+```
+
+
+## Scaline scenario valuations
+
+```{r eval = F}
+study1_scaling <- read.csv("grat_wtr_study1_scaling.csv", header = T)
+study1_scaling <- study1_scaling[-(1:2),]
+study1_scaling[,paste("S",1:21,sep="")] <- sapply(study1_scaling[,paste("S",1:21,sep="")], as.character)
+study1_scaling[,paste("S",1:21,sep="")] <- sapply(study1_scaling[,paste("S",1:21,sep="")], as.numeric)
+
+scale_map <- colMeans(study1_scaling[,paste("S",1:21,sep="")], na.rm = T)
+
+study1_clean$scenario_val <- scale_map[study1_clean$scenario]
+
+study1_clean$log_scenario_val <- log(study1_clean$scenario_val, base = 10)
+
+```
+
+
+## Reanalysis
+
+```{r eval = F}
+grat_out <- lmer(grateful ~ wtr_os_est + log_scenario_val + (1 + log_scenario_val | ResponseId), data = study1_clean)
+summary(grat_out)
+```
+
+
+
+```{r eval = F}
+want_out <- lmer(want ~ wtr_os_est + log_scenario_val + (1 + log_scenario_val | ResponseId), data = study1_clean)
+summary(want_out)
+```
+
+```{r eval = F}
+oblig_out <- lmer(obligated ~ wtr_os_est + log_scenario_val + (1 + log_scenario_val | ResponseId), data = study1_clean)
+summary(oblig_out)
+```
+
+```{r eval = F}
+happy_out <- lmer(happy ~ wtr_os_est + log_scenario_val + (1 + log_scenario_val | ResponseId), data = study1_clean)
+summary(happy_out)
+```
+
