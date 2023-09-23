@@ -1,22 +1,7 @@
----
-title: "gratitude project"
-author: "Chenlingxi (Lyncie) Xu"
-date: "7/12/2022"
-output: pdf_document
----
-
-```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
-```
-
-## R Markdown
-
-This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
-
-When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
-
-```{r}
+## analysis script
+setwd(dirname(rstudioapi::documentPath()))
 library(tidyverse)
+
 
 data <- read.csv("gratitude.csv", header = T)
 data <-  data[,-c(62,63)]
@@ -49,6 +34,9 @@ scale_map <- colMeans(study1_scaling[,paste("S",1:21,sep="")], na.rm = T)
 data_restructure$scenario_val <- scale_map[data_restructure$scenario]
 data_restructure$log_scenario_val <- log(data_restructure$scenario_val, base = 10)
 
+## working up until this point
+
+
 study1_scaling[,paste("",1:21,sep="")] <- sapply(study1_scaling[,paste("",1:21,sep="")], as.character)
 study1_scaling[,paste("",1:21,sep="")] <- sapply(study1_scaling[,paste("",1:21,sep="")], as.numeric)
 
@@ -62,4 +50,4 @@ data_restructure[data_restructure == "Q3"] <- "1"
 
 
 
-```
+
