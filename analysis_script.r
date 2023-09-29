@@ -1,4 +1,5 @@
 ## analysis script
+### data restructure by lyncie
 setwd(dirname(rstudioapi::documentPath()))
 library(tidyverse)
 
@@ -25,29 +26,9 @@ data_restructure <- data %>%
 data_restructure <- data_restructure[,-c(2,5)]
 data_restructure$scenario <- paste("S", data_restructure$scenario, sep="")
 
-study1_scaling <- read.csv("grat_wtr_study1_scaling.csv", header = T)
-study1_scaling <- study1_scaling[-(1:2),]
-study1_scaling[,paste("S",1:21,sep="")] <- sapply(study1_scaling[,paste("S",1:21,sep="")], as.character)
-study1_scaling[,paste("S",1:21,sep="")] <- sapply(study1_scaling[,paste("S",1:21,sep="")], as.numeric)
-scale_map <- colMeans(study1_scaling[,paste("S",1:21,sep="")], na.rm = T)
-
-data_restructure$scenario_val <- scale_map[data_restructure$scenario]
-data_restructure$log_scenario_val <- log(data_restructure$scenario_val, base = 10)
-
-## working up until this point
-
-
-study1_scaling[,paste("",1:21,sep="")] <- sapply(study1_scaling[,paste("",1:21,sep="")], as.character)
-study1_scaling[,paste("",1:21,sep="")] <- sapply(study1_scaling[,paste("",1:21,sep="")], as.numeric)
-
-scale_map <- colMeans(study1_scaling[,1:21], na.rm = T)
-study1_restructure$scenario_val <- scale_map[study1_restructure$scenario]
-study1_restructure$log_scenario_val <- log(study1_restructure$scenario_val, base = 10)
-
-#dummy code friend vs. stranger (0=friend, 1=stranger)
-data_restructure[data_restructure == "Q2"] <- "0"
-data_restructure[data_restructure == "Q3"] <- "1"
-
-
+View(data_restructure)
+dim(data_restructure)
+## Q2 (Stranger), Q3 (Friends)
+unique(data_restructure$condition)
 
 
