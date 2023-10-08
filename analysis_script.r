@@ -1,8 +1,9 @@
 ## analysis script
-### data restructure by lyncie
+### data restructure by lyncie _ Updated 10/5/2023
 setwd(dirname(rstudioapi::documentPath()))
 library(tidyverse)
-
+library(dplyr)
+library(rstatix)
 
 data <- read.csv("gratitude.csv", header = T)
 data <-  data[,-c(62,63)]
@@ -31,4 +32,32 @@ dim(data_restructure)
 ## Q2 (Stranger), Q3 (Friends)
 unique(data_restructure$condition)
 
+# Turning into Long format
+Data_long <- data_restructure %>%
+  gather(key="Type",value="Score", grateful, obligated, want) %>%
+  convert_as_factor(condition,Type)
+
+Data_long$Type <- factor(Data_long$Type,
+                        levels = c("grateful", "obligated", "want"))
+
+Data_long_averaged <- Data_long %>%
+  group_by(subject, condition, Type) %>%
+  summarise(score = mean(Score, na.rm = TRUE)) %>%
+  ungroup()
+
+# 2X3 ANOVA on Grateful
+res.aov <- anova_test(data = Data_long_averaged, dv = score, wid = subject,
+                      between  = c(condition,Type), effect.size = "pes")
+get_anova_table(res.aov)
+
+aov_res <- aov(score ~ condition*Type + Error(subject/(condition*Type)), data = Data_long_averaged)
+
+library(emmeans)
+
+# Calculate the estimated marginal means
+emm <- emmeans(aov_res, specs = pairwise ~ condition * Type)
+
+# Conduct pairwise comparisons for 'type'
+pairwise_comp <- pairs(emm, adjust = "bonferroni")
+print(pairwise_comp)
 
