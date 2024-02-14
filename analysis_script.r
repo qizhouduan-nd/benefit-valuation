@@ -61,3 +61,20 @@ emm <- emmeans(aov_res, specs = pairwise ~ condition * Type)
 pairwise_comp <- pairs(emm, adjust = "bonferroni")
 print(pairwise_comp)
 
+## multi-level model here
+library(lme4)
+library(tidyr)
+library(ggplot2)
+library(reshape2)
+library(tidyverse)
+library(haven)
+library(aod)
+library(WeMix)
+library(psych)
+library(lavaan)
+library(lmtest)
+
+model = lmer(Score ~ Type + (1 | subject),data = Data_long)
+model
+
+
