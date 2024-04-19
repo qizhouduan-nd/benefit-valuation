@@ -49,6 +49,7 @@ Data_long_averaged <- Data_long %>%
 res.aov <- anova_test(data = Data_long_averaged, dv = score, wid = subject,
                       between  = c(condition,Type), effect.size = "pes")
 get_anova_table(res.aov)
+boxplot(score ~ condition, data = Data_long_averaged, main = "ANOVA Boxplot", ylab = "Response", xlab = "Group")
 
 aov_res <- aov(score ~ condition*Type + Error(subject/(condition*Type)), data = Data_long_averaged)
 
@@ -76,5 +77,13 @@ library(lmtest)
 
 model = lmer(Score ~ Type + (1 | subject),data = Data_long)
 model
+
+
+## age range
+friend_data = data_restructure[data_restructure$condition == 'Q2',]
+stranger_data = data_restructure[data_restructure$condition == 'Q3',]
+
+hist(friend_data$grateful)
+hist(stranger_data$grateful)
 
 
