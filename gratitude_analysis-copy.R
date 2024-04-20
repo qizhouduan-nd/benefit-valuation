@@ -63,27 +63,7 @@ res.aov <- anova_test(data = Data_long_averaged, dv = score, wid = subject,
                       between  = c(condition,Type), effect.size = "pes")
 get_anova_table(res.aov)
 
-# Boxplot
-boxplot(score ~ condition, data = Data_long_averaged, main = "ANOVA Boxplot", ylab = "Response", xlab = "condition")
-
-
 aov_res <- aov(score ~ condition*Type + Error(subject/(condition*Type)), data = Data_long_averaged)
-
-interaction.plot(x.factor = Data_long_averaged$condition, trace.factor = Data_long_averaged$Type, 
-                 response = Data_long_averaged$score,
-                 type = "b", pch = 19, col = c("red", "blue"),
-                 xlab = "Condition", ylab = "Response", trace.label = "Type")
-
-# Load ggplot2
-library(ggplot2)
-
-# ggplot2 for interaction effects
-ggplot(Data_long_averaged, aes(x = condition, y = score, color = Type, group = Type)) +
-  geom_line(aes(linetype = Type), size = 1) +
-  geom_point(size = 3) +
-  labs(title = "Interaction Plot", x = "Condition", y = "Score") +
-  theme_minimal()
-
 
 library(emmeans)
 
